@@ -1,53 +1,32 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
-import 'package:newsapp/models/article_model.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:newsapp/models/category_model.dart';
-import 'package:newsapp/models/slider_model.dart';
-import 'package:newsapp/pages/all_news.dart';
-import 'package:newsapp/pages/article_view.dart';
-import 'package:newsapp/pages/category_news.dart';
 import 'package:newsapp/services/data.dart';
-import 'package:newsapp/services/news.dart';
-import 'package:newsapp/services/slider_data.dart';
+import 'package:newsapp/viewmodels/home_viewmodel.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
-class Home extends StatefulWidget {
+import 'all_news.dart';
+import 'article_view.dart';
+import 'category_news.dart';
+
+final homeViewModelProvider =
+    ChangeNotifierProvider((ref) => HomeViewModel());
+
+class Home extends ConsumerStatefulWidget {
   const Home({super.key});
 
   @override
-  State<Home> createState() => _HomeState();
+  ConsumerState<Home> createState() => _HomeState();
 }
 
-class _HomeState extends State<Home> {
-  int activeIndex = 0;
-  List<ArticleModel> articles = [];
+class _HomeState extends ConsumerState<Home> {
   late List<CategoryModel> categories = [];
-  List<sliderModel> sliders = [];
-
-  bool _loading = true;
-
   @override
   void initState() {
     categories = getCategories();
-    getSlider();
-    getNews();
     super.initState();
-  }
-
-  getNews() async {
-    News newsclass = News();
-    await newsclass.getNews();
-    articles = newsclass.news;
-    setState(() {
-      _loading = false;
-    });
-  }
-
-  getSlider() async {
-    Sliders slider = Sliders();
-    await slider.getSlider();
-    sliders = slider.sliders;
   }
 
   Widget buildImage(String image, int index, String name) => Container(
@@ -90,14 +69,15 @@ class _HomeState extends State<Home> {
       );
 
   Widget buildIndicator() => AnimatedSmoothIndicator(
-        activeIndex: activeIndex,
-        count: sliders.length,
+        activeIndex: ref.watch(homeViewModelProvider).activeIndex,
+        count: ref.watch(homeViewModelProvider).sliders.length,
         effect: const SlideEffect(
             dotWidth: 15, dotHeight: 15, activeDotColor: Colors.blue),
       );
 
   @override
   Widget build(BuildContext context) {
+    final homeViewModel = ref.watch(homeViewModelProvider);
     return Scaffold(
       appBar: AppBar(
         title: const Row(
@@ -124,7 +104,7 @@ class _HomeState extends State<Home> {
         centerTitle: true,
         elevation: 0.0,
       ),
-      body: _loading
+      body: homeViewModel.loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               child: Column(
@@ -180,8 +160,9 @@ class _HomeState extends State<Home> {
                   CarouselSlider.builder(
                     itemCount: 5,
                     itemBuilder: (context, index, realIndex) {
-                      String? res = sliders[index].urlToImage;
-                      String? res1 = sliders[index].title;
+                      String? res =
+                          homeViewModel.sliders[index].urlToImage;
+                      String? res1 = homeViewModel.sliders[index].title;
                       return buildImage(res!, index, res1!);
                     },
                     options: CarouselOptions(
@@ -190,9 +171,7 @@ class _HomeState extends State<Home> {
                         enlargeCenterPage: true,
                         enlargeStrategy: CenterPageEnlargeStrategy.height,
                         onPageChanged: (index, reason) {
-                          setState(() {
-                            activeIndex = index;
-                          });
+                          homeViewModel.setActiveIndex(index);
                         }),
                   ),
                   const SizedBox(height: 30.0),
@@ -233,13 +212,13 @@ class _HomeState extends State<Home> {
                       scrollDirection: Axis.vertical,
                       physics: const ClampingScrollPhysics(),
                       shrinkWrap: true,
-                      itemCount: articles.length,
+                      itemCount: homeViewModel.articles.length,
                       itemBuilder: (context, index) {
                         return BlockTile(
-                          url: articles[index].url!,
-                          desc: articles[index].description!,
-                          imageUrl: articles[index].urlToImage!,
-                          title: articles[index].title!,
+                          url: homeViewModel.articles[index].url!,
+                          desc: homeViewModel.articles[index].description!,
+                          imageUrl: homeViewModel.articles[index].urlToImage!,
+                          title: homeViewModel.articles[index].title!,
                         );
                       }),
                 ],
@@ -319,7 +298,7 @@ class BlockTile extends StatelessWidget {
             MaterialPageRoute(builder: (context) => ArticleView(blogUrl: url)));
       },
       child: Container(
-        margin: EdgeInsets.only(bottom: 10),
+        margin: const EdgeInsets.only(bottom: 10),
         child: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Material(
